@@ -1,0 +1,85 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use Data::Dumper;
+
+my $input_file = 'phase2_data.txt';
+open my $fh, '<', $input_file or die "Could not open $input_file: $!";
+
+my %trial_data;
+
+while (my $line = <$fh>) {
+    chomp $line;
+    next if $line =~ /^#/;
+    next unless $line;
+
+    my ($patient_id, $record_type, @fields) = split /\|/, $line;
+
+    unless (exists $trial_data{$patient_id}) {
+        $trial_data{$patient_id} = {
+            randomization_arm => '',
+            efficacy_outcomes => [],
+            adverse_events => []
+        };
+    }
+
+    if ($record_type eq 'TREATMENT') {
+        # Format: TREATMENT|RandomizationArm
+        my ($randomization_arm) = @fields;
+        $trial_data{$patient_id}->{randomization_arm} = $randomization_arm;
+    } elsif ($record_type eq 'EFFICACY') {
+        # Format: EFFICACY|OutcomeDescription
+        my ($outcome) = @fields;
+        push @{$trial_data{$patient_id}->{efficacy_outcomes}}, $outcome;
+    } elsif ($record_type eq 'AE') {
+        # Format: AE|Term|Severity|Relationship
+        my ($term, $severity, $relationship) = @fields;
+        push @{$trial_data{$patient_id}->{adverse_events}}, {
+            term => $term,
+            severity => $severity,
+            relationship => $relationship
+        };
+    }
+}
+
+close $fh;
+
+# Generate a summary report
+print "--- Phase 2 Trial Efficacy and Safety Summary ---\n\n";
+
+foreach my $patient (sort keys %trial_data) {
+    print "Patient ID: $patient\n";
+    print "  Randomization Arm: $trial_data{$patient}->{randomization_arm}\n";
+
+    # Efficacy Report
+    my $efficacy_count = @{$trial_data{$patient}->{efficacy_outcomes}};
+    print "  Efficacy Outcomes Logged: $efficacy_count\n";
+    foreach my $outcome (@{$trial_data{$patient}->{efficacy_outcomes}}) {
+        print "    - $outcome\n";
+    }
+
+    # Adverse Events Report
+    my $ae_count = @{$trial_data{$patient}->{adverse_events}};
+    print "  Adverse Events Logged: $ae_count\n";
+    foreach my $ae (@{$trial_data{$patient}->{adverse_events}}) {
+        print "    - Term: $ae->{term}, Severity: $ae->{severity}, Relationship: $ae->{relationship}\n";
+    }
+    print "\n";
+}
+
+__END__
+# Data for phase2_data.txt
+# PatientID|RecordType|Data
+# TREATMENT: RandomizationArm
+# EFFICACY: OutcomeDescription
+# AE: Term|Severity|Relationship
+
+P001|TREATMENT|Active Drug
+P001|EFFICACY|Tumor size reduced by 15%
+P001|AE|Nausea|Mild|Related
+P002|TREATMENT|Placebo
+P002|EFFICACY|Tumor size increased by 5%
+P003|TREATMENT|Active Drug
+P003|EFFICACY|Symptom score improved from 8 to 2
+P003|AE|Headache|Moderate|Related
+P003|AE|Fatigue|Mild|Related
